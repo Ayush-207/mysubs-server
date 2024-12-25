@@ -1,16 +1,15 @@
-import {Request, Response, NextFunction} from 'express'
-import {mongo} from 'mongoose'
+import { ErrorRequestHandler } from 'express'
 import {TRPCError} from '@trpc/server'
 
-export const errorHandler = (
-    err: TRPCError,
-    req: Request,
-    res: Response,  
-    next: NextFunction) => {
-    console.log("hellow")
-  
-    if(err instanceof TRPCError){
-        res.status(500).send("TRPC Error")
+export const errorHandler: ErrorRequestHandler = (
+    err,
+    req,
+    res,  
+    next) => {
+    
+    if(err instanceof Error){
+        console.log(err)
+        res.status(500).json({error: err.message})
     }
     next()
 }

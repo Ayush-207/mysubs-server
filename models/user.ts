@@ -1,4 +1,5 @@
 import mongoose from 'mongoose'
+import { boolean } from 'zod';
 
 const userSchema = new mongoose.Schema({
     email: {
@@ -21,6 +22,14 @@ const userSchema = new mongoose.Schema({
     lastname: {
         type: String,
         required: true
+    }, 
+    uniqueString: {
+        type: String
+    },
+    verified: {
+        type: Boolean, 
+        required: true, 
+        default: false
     }
 })
 
