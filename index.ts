@@ -146,6 +146,11 @@ app.post(
   })
 );
 
+app.post(
+  "/auth/register/reddit",
+  asyncHandler(async (req: Request, res: Response) => {})
+);
+
 app.get("/subreddits", async (req: Request, res: Response) => {
   try {
     const page =
@@ -156,12 +161,15 @@ app.get("/subreddits", async (req: Request, res: Response) => {
     const skip = (page - 1) * limit;
     const token = req.headers.authorization;
     const access_token = token?.replace("Bearer ", "");
+    console.log(token);
+    console.log(access_token);
     if (token && access_token && access_token?.length > 0) {
       try {
         const payload = jwt.verify(
           access_token,
           process.env.JWT_KEY || "randomsecret"
         );
+        console.log(payload);
         if (payload) {
           const subreddits = await Subreddit.find()
             .sort({ subscribers: -1 })
