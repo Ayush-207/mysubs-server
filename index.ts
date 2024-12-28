@@ -3,10 +3,6 @@ import dotenv from "dotenv";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import mongoose from "mongoose";
-import { router } from "./lib/trpc.js";
-import { authRouter } from "./routes/auth";
-import * as trpcExpress from "@trpc/server/adapters/express";
-import { createContext } from "./lib/trpc.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
 import "./scraping/scraping.js";
 import Subreddit from "./models/subreddit.js";
@@ -19,10 +15,6 @@ import { asyncHandler } from "./lib/asyncHandler.js";
 import jwt from "jsonwebtoken";
 
 dotenv.config();
-
-const appRouter = router({
-  auth: authRouter,
-});
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -40,53 +32,79 @@ app.use(cookieParser());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.use(
-  "/trpc",
-  trpcExpress.createExpressMiddleware({
-    router: appRouter,
-    createContext,
+const maxAge = 3 * 24 * 60 * 60 * 1000;
+
+const createToken = (email: string, userId: string) => {
+  return jwt.sign({ email, userId }, process.env.JWT_KEY || "randomSecret", {
+    expiresIn: maxAge,
+  });
+};
+
+function generateOTP() {
+  return crypto.randomInt(100000, 999999);
+}
+
+app.post(
+  "/sign-in",
+  asyncHandler(async (req: Request, res: Response) => {
+    const { email, password } = req.body;
+    const user = await User.findOne({
+      email: email,
+    });
+    if (user) {
+      const comparePassword = await bcrypt.compare(password, user.password);
+      if (comparePassword) {
+        const token = createToken(email, user.id);
+        res.status(200).send({ user, token });
+      } else {
+        res.status(400).send("Email or password invalid.");
+        return;
+      }
+    } else {
+      res.status(400).send("User not found. Try signing up.");
+      return;
+    }
   })
 );
 
-app.get("/verify-email/:id/:token", async (req: Request, res: Response) => {
-  try {
-    const token = req.params.token;
-    const id = req.params.id;
-    const user = await User.findById(id);
-    const isValidToken = (user?.uniqueString ?? "akjfkdjdfd") == token;
-    if (!user) {
-      res.status(401).send({
-        msg: "We were unable to find a user for this verification. Please SignUp!",
-      });
-      return;
-    } else if (!isValidToken) {
-      res.status(401).send({
-        msg: "Incorrect token for this user. Please try again.",
-      });
-      return;
-    } else {
-      if (user.verified) {
-        res.status(200).send("User has been already verified. Please Login");
-        return;
-      } else {
-        const updated = await User.findOneAndUpdate(
-          { id: user.id },
-          { verified: true }
-        );
+app.post(
+  "/sign-up",
+  asyncHandler(async (req: Request, res: Response) => {
+    const { firstname, lastname, username, email, password } = req.body;
+    const existingUser = await User.findOne({
+      $or: [{ email }, { username }],
+    });
 
-        if (!updated) {
-          res.status(500).send({ msg: "Failed to verify. Try again." });
-          return;
-        } else {
-          res.status(200).send("Your account has been successfully verified");
-          return;
-        }
+    if (existingUser) {
+      let errors: string[] = [];
+      if (email === existingUser.email) {
+        errors.push("Email already exists");
       }
+      if (username === existingUser.username) {
+        errors.push("Username already exists");
+      }
+
+      res
+        .status(400)
+        .send(
+          errors.length < 2 ? errors[0] : "Email and Username already exists"
+        );
+    } else {
+      const saltRounds = 10;
+      const salt = await bcrypt.genSalt(saltRounds);
+      const hashedPassword = await bcrypt.hash(password, salt);
+      const user = await User.create({
+        firstname,
+        lastname,
+        username,
+        email,
+        password: hashedPassword,
+      });
+      const token = createToken(email, user.id);
+      res.status(200).send({ user, token });
     }
-  } catch (error) {
-    console.log(error);
-  }
-});
+  })
+);
 
 app.post(
   "/reset-password",
@@ -106,7 +124,7 @@ app.post(
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    await user.updateOne({ password: hashedPassword, verified: true });
+    await user.updateOne({ password: hashedPassword });
     res.status(200).send("Password updated successfully.");
   })
 );
@@ -232,5 +250,3 @@ mongoose
   .catch((err: Error) => {
     console.log(err.message);
   });
-
-export type AppRouter = typeof appRouter;
