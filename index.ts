@@ -225,6 +225,12 @@ app.get("/subreddits", async (req: Request, res: Response) => {
           data: subreddits,
         });
       }
+    } else {
+      res.status(400).json({
+        success: false,
+        message: "BAD_REQUEST",
+        error: "No authorization token",
+      });
     }
   } catch (error) {
     console.error(`error: ${error}`);
