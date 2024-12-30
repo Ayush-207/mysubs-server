@@ -4,7 +4,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import mongoose from "mongoose";
 import { errorHandler } from "./middlewares/errorHandler.js";
-import "./scraping/scraping.js";
+import "../scraping/scraping.js";
 import Subreddit from "./models/subreddit.js";
 import User from "./models/user.js";
 import Token from "./models/token.js";
